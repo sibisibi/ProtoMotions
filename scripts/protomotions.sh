@@ -9,30 +9,21 @@ export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib/"
 
 robot="g1"
 
-motion_files=(
-    "curation_1111_retarget_1000/g1.pt"
-    "curation_1111_retarget_1100/g1.pt"
-    "curation_1111_retarget_1110/g1.pt"
-    "curation_1111_retarget_1111/g1.pt"
-    "curation_1111_retarget_1111/g1_mocap.pt"
-    "curation_1111_retarget_1111/g1_video.pt"
-)
-
 experiment_names=(
-    "curation_1111_retarget_1000/g1"
-    "curation_1111_retarget_1100/g1"
-    "curation_1111_retarget_1110/g1"
-    "curation_1111_retarget_1111/g1"
-    "curation_1111_retarget_1111/g1_mocap"
-    "curation_1111_retarget_1111/g1_video"
+    "curation_1111_retarget_1000/${robot}"
+    "curation_1111_retarget_1100/${robot}"
+    "curation_1111_retarget_1110/${robot}"
+    "curation_1111_retarget_1111/${robot}"
+    "curation_1111_retarget_1111/${robot}_mocap"
+    "curation_1111_retarget_1111/${robot}_video"
 )
 
 ########################################################################################################
 # Download the motion data
 ########################################################################################################
 
-for motion_file in "${motion_files[@]}"; do
-    huggingface-cli download bioceo78/phuma ${motion_file} \
+for experiment_name in "${experiment_names[@]}"; do
+    huggingface-cli download bioceo78/phuma "${experiment_name}.pt" \
         --repo-type dataset \
         --local-dir data/phuma
 done
@@ -45,21 +36,15 @@ done
 # bash scripts/protomotions.sh
 
 gpu=2
-export CUDA_VISIBLE_DEVICES=${gpu}
-export HYDRA_FULL_ERROR=1
-
-robot="g1"
-
 exp_idx=0
-motion_file=${motion_files[$exp_idx]}
 experiment_name=${experiment_names[$exp_idx]}
 
-python protomotions/train_agent.py \
+CUDA_VISIBLE_DEVICES=${gpu} python protomotions/train_agent.py \
     +exp=full_body_tracker/transformer_flat_terrain \
     +robot=${robot} \
     +simulator=isaacgym \
     +terrain=flat \
-    motion_file="data/phuma/${motion_file}" \
+    motion_file="data/phuma/${experiment_name}.pt" \
     ngpu=1 \
     num_envs=8192 \
     agent.config.eval_metrics_every=100000 \
