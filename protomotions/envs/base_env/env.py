@@ -135,7 +135,7 @@ class BaseEnv:
         return obs
 
     def get_action_size(self):
-        return self.simulator.num_act
+        return self.simulator.robot_config.number_of_actions
 
     def get_envs_respawn_position(
         self,

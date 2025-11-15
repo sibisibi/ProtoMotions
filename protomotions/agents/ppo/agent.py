@@ -327,6 +327,7 @@ class PPO:
 
             # Save model checkpoint at specified intervals before evaluation.
             if self.current_epoch % self.config.manual_save_every == 0:
+                self.save(name=f"epoch_{self.current_epoch}.ckpt")
                 self.save()
 
             if (

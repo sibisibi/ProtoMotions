@@ -40,6 +40,7 @@ env:
         dv_rew_w: 0.15
         rh_rew_w: 0.1
         pow_rew_w: 0.0002
+        action_rate_rew_w: 0.0
 
       component_coefficients:
         gt_rew_c: -1

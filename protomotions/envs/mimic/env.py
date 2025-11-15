@@ -36,6 +36,18 @@ class Mimic(BaseEnv):
             self.num_envs, dtype=torch.bool, device=self.device
         )
         
+        # Buffers for action-rate penalty computation
+        self.prev_actions = torch.zeros(
+            (self.num_envs, self.get_action_size()),
+            device=self.device,
+            dtype=torch.float,
+        )
+        self.current_actions = torch.zeros(
+            (self.num_envs, self.get_action_size()),
+            device=self.device,
+            dtype=torch.float,
+        )
+        
     def create_motion_manager(self):
         self.motion_manager = MimicMotionManager(self.config.motion_manager, self)
         
@@ -420,6 +432,15 @@ class Mimic(BaseEnv):
         pow_rew[has_reset_grace] = 0
 
         rew_dict["pow_rew"] = pow_rew
+        
+        # Action rate penalty: ||a_t - a_{t-1}||^2
+        action_rate_penalty = torch.sum(
+            torch.square(self.current_actions - self.prev_actions), dim=1
+        )
+        action_rate_rew = -action_rate_penalty
+        # Apply grace period (similar to power reward)
+        action_rate_rew[has_reset_grace] = 0.0
+        rew_dict["action_rate_rew"] = action_rate_rew
 
         local_ref_gt = self.rotate_pos_to_local(ref_gt, ref_inv_heading)
         local_gt = self.rotate_pos_to_local(relative_to_data_gt, inv_heading)
@@ -501,13 +522,17 @@ class Mimic(BaseEnv):
     def pre_physics_step(self, actions):
         if self.config.mimic_residual_control:
             actions = self.residual_actions_to_actual(actions)
-
+        # Store current actions for action rate penalty computation
+        self.current_actions = actions.clone()
         return super().pre_physics_step(actions)
 
     def post_physics_step(self):
         self.motion_manager.post_physics_step()
         super().post_physics_step()
         self.motion_manager.handle_reset_track()
+        
+        # Update previous actions AFTER reward computation for next timestep
+        self.prev_actions[:] = self.current_actions.clone()
         
         if self.config.masked_mimic.enabled:
             self.masked_mimic_obs_cb.post_physics_step()
@@ -520,6 +545,8 @@ class Mimic(BaseEnv):
         if env_ids is None:
             env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
         if len(env_ids) > 0:
+            # Reset previous actions for environments that are resetting
+            self.prev_actions[env_ids] = 0.0
             if self.config.masked_mimic.enabled:
                 self.masked_mimic_obs_cb.reset_track(env_ids)
         return super().reset(env_ids)
